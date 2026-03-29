@@ -44,6 +44,19 @@ let
     mount --bind /run/fhs/bin /bin
     mount --bind /run/fhs/usr /usr
 
+    # Replace NixOS /etc symlinks with real files.
+    # bwrap (bubblewrap) creates a new mount namespace where FEX's userspace
+    # rootfs overlay isn't present. It then tries to stat/bind-mount /etc files
+    # and fails on NixOS symlinks. Materializing them as real files fixes this.
+    for f in /etc/host.conf /etc/hosts /etc/resolv.conf /etc/machine-id /etc/localtime /etc/nsswitch.conf; do
+      if [ -L "$f" ]; then
+        target=$(readlink -f "$f" 2>/dev/null) || continue
+        [ -f "$target" ] || continue
+        rm -f "$f"
+        cp "$target" "$f"
+      fi
+    done
+
     # FEX needs suid fusermount for rootfs overlay mounting
     mkdir -p /run/wrappers
     mount -t tmpfs -o exec,suid tmpfs /run/wrappers
