@@ -46,30 +46,33 @@ let
 
     # Fix NixOS /etc for PressureVessel/bwrap compatibility.
     #
-    # steamwebhelper runs inside PressureVessel (via bwrap). bwrap creates a new
-    # mount namespace where FEX's userspace rootfs overlay isn't active. It then
-    # tries to bind-mount /etc files from the host and fails on NixOS symlinks
-    # (e.g. /etc/host.conf -> /etc/static/... -> /nix/store/...).
+    # /etc is read-only inside muvm (host filesystem). Same bind-mount approach as /usr.
+    # bwrap fails on NixOS symlinks (host.conf -> /etc/static/ -> /nix/store/...) when
+    # it creates a new mount namespace without FEX's rootfs overlay.
     #
-    # Fix: materialize NixOS symlinks as real files, and create stub entries for
-    # paths PressureVessel expects. This is the full list from pressure-vessel-wrap.
-    for f in /etc/host.conf /etc/hosts /etc/localtime /etc/os-release \
-             /etc/resolv.conf /etc/nsswitch.conf /etc/group /etc/passwd \
-             /etc/machine-id; do
-      if [ -L "$f" ]; then
-        target=$(readlink -f "$f" 2>/dev/null) || continue
-        rm -f "$f"
+    # Fix: copy /etc to writable tmpfs, materialize symlinks, add stubs, bind-mount over.
+    mkdir -p /run/fhs/etc
+    cp -a /etc/. /run/fhs/etc/ 2>/dev/null || true
+
+    # Materialize NixOS symlinks as real files
+    for f in host.conf hosts localtime os-release resolv.conf nsswitch.conf \
+             group passwd machine-id; do
+      if [ -L "/run/fhs/etc/$f" ]; then
+        target=$(readlink -f "/run/fhs/etc/$f" 2>/dev/null) || continue
+        rm -f "/run/fhs/etc/$f"
         if [ -f "$target" ]; then
-          cp "$target" "$f"
+          cp "$target" "/run/fhs/etc/$f"
         elif [ -d "$target" ]; then
-          rm -f "$f" && mkdir -p "$f" && cp -a "$target/." "$f/"
+          mkdir -p "/run/fhs/etc/$f" && cp -a "$target/." "/run/fhs/etc/$f/"
         fi
       fi
     done
 
-    # Create stub dirs/files PressureVessel checks but NixOS doesn't have
-    mkdir -p /etc/ld.so.conf.d /etc/alternatives /etc/xdg /etc/pulse
-    touch /etc/ld.so.cache /etc/ld.so.conf /etc/timezone
+    # Create stub dirs/files PressureVessel expects but NixOS doesn't have
+    mkdir -p /run/fhs/etc/ld.so.conf.d /run/fhs/etc/alternatives /run/fhs/etc/xdg /run/fhs/etc/pulse
+    touch /run/fhs/etc/ld.so.cache /run/fhs/etc/ld.so.conf /run/fhs/etc/timezone
+
+    mount --bind /run/fhs/etc /etc
 
     # FEX needs suid fusermount for rootfs overlay mounting
     mkdir -p /run/wrappers
