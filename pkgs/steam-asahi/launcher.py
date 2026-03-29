@@ -162,28 +162,17 @@ def cleanup_steam_runtime_libs():
 
 
 def run_steam(data_dir):
-    """Launch Steam via muvm + FEXBash."""
-    steam_args = " ".join(STEAM_ARGS + sys.argv[1:])
+    """Launch Steam via muvm + FEXBash.
 
-    env_flags = [
-        "-e", "PULSE_CLIENTCONFIG=/run/pulse.conf",
-        # Bypass Steam's glibc verification checks
-        "-e", "STEAMOS=1",
-        "-e", "STEAM_RUNTIME=1",
-        # Workaround for CEF/steamwebhelper crashes
-        "-e", "STEAM_ENABLE_CEF_SHUTDOWN=0",
-        # Disable Chromium sandbox — seccomp-bpf doesn't work under FEX
-        "-e", "STEAM_CEF_COMMAND_LINE=--no-sandbox --disable-gpu-sandbox",
-        # Fix locale (CEF is sensitive to locale failures)
-        "-e", "LC_ALL=C.UTF-8",
-        "-e", "LANG=C.UTF-8",
-    ]
+    Matches Fedora Asahi's approach: minimal flags, no --interactive.
+    muvm 0.5.x fixed CEF issues at the VM level so workarounds aren't needed.
+    The only addition is --execute-pre for NixOS FHS path fixups.
+    """
+    steam_args = " ".join(STEAM_ARGS + sys.argv[1:])
 
     cmd = [
         MUVM,
         "--execute-pre", INIT_SCRIPT,
-        *env_flags,
-        "--interactive",
         "--",
         "FEXBash",
         "-c",
@@ -213,10 +202,7 @@ def main():
     data_dir = BaseDirectory.save_data_path(LAUNCHER_NAME)
     ensure_steam_bootstrap(data_dir)
 
-    # Step 3: Clean up conflicting Steam runtime libraries
-    cleanup_steam_runtime_libs()
-
-    # Step 4: Launch Steam
+    # Step 3: Launch Steam
     run_steam(data_dir)
 
 
