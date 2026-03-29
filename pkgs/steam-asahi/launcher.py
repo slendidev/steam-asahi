@@ -172,6 +172,11 @@ def run_steam(data_dir):
         "-e", "STEAM_RUNTIME=1",
         # Workaround for CEF/steamwebhelper crashes
         "-e", "STEAM_ENABLE_CEF_SHUTDOWN=0",
+        # Disable Chromium sandbox — seccomp-bpf doesn't work under FEX
+        "-e", "STEAM_CEF_COMMAND_LINE=--no-sandbox --disable-gpu-sandbox",
+        # Fix locale (CEF is sensitive to locale failures)
+        "-e", "LC_ALL=C.UTF-8",
+        "-e", "LANG=C.UTF-8",
     ]
 
     cmd = [
