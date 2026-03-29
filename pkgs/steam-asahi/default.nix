@@ -16,7 +16,7 @@
 let
   steamBootstrap = fetchurl {
     url = "https://repo.steampowered.com/steam/archive/stable/steam_1.0.0.81.tar.gz";
-    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: compute on first build
+    hash = "sha256-Gia5182s4J4E3Ia1EeC5kjJX9mSltsr+b+1eRtEXtPk=";
   };
 
   initScript = writeShellScript "steam-asahi-init" ''

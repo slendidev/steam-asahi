@@ -41,7 +41,7 @@
 
           cargoDeps = prev.rustPlatform.fetchCargoVendor {
             inherit src;
-            hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: compute
+            hash = "sha256-0xpAyNe1jF1OMtc7FXMsejqIv0xKc1ktEvm3rj/mVFU=";
           };
 
           buildInputs = old.buildInputs ++ [ prev.libcap_ng ];
@@ -61,6 +61,15 @@
           cargoDeps = prev.rustPlatform.importCargoLock {
             lockFile = src + "/Cargo.lock";
           };
+
+          # Override postPatch: /sbin/sysctl reference was removed in 0.5.1
+          postPatch = ''
+            substituteInPlace crates/muvm/src/guest/bin/muvm-guest.rs \
+              --replace-fail "/usr/lib/systemd/systemd-udevd" "${prev.systemd}/lib/systemd/systemd-udevd"
+          '' + prev.lib.optionalString prev.stdenv.hostPlatform.isAarch64 ''
+            substituteInPlace crates/muvm/src/guest/mount.rs \
+              --replace-fail "/usr/share/fex-emu" "${final.fex}/share/fex-emu"
+          '';
         });
 
         # --- FEX 2603 (with thunks) ---
@@ -71,21 +80,20 @@
             owner = "FEX-Emu";
             repo = "FEX";
             tag = "FEX-2603";
-            hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: compute
+            hash = "sha256-rQOqziJ7IizJV3VmAWGo5s2xn2/xnp0sx3VfBtH1JK4=";
 
             leaveDotGit = true;
             postFetch = ''
               cd $out
               git reset
 
-              # Fetch required submodules (same as nixpkgs 2511 + rpmalloc for 2603)
+              # Fetch required submodules for FEX 2603
               git submodule update --init --depth 1 \
                 External/Vulkan-Headers \
                 External/drm-headers \
-                External/jemalloc \
                 External/jemalloc_glibc \
                 External/rpmalloc \
-                External/robin-map \
+                External/unordered_dense \
                 External/vixl \
                 Source/Common/cpp-optparse
 
@@ -97,6 +105,22 @@
                 External/vixl/test
             '';
           };
+
+          nativeBuildInputs = old.nativeBuildInputs ++ [ prev.git ];
+
+          # Tests can't run on 16K page systems (jemalloc crashes)
+          doCheck = false;
+
+          # FEX 2603 needs a git repo for version detection (git_version.h).
+          # Create a fake one, then run the original nixpkgs postPatch for thunk path fixups.
+          postPatch = ''
+            git init
+            git config user.email "nix@localhost"
+            git config user.name "Nix"
+            git add .
+            git commit -m "FEX-2603" --quiet
+            git tag "FEX-2603"
+          '' + old.postPatch;
         });
       };
 
