@@ -179,7 +179,12 @@ def run_steam(data_dir):
         # forwarding) inside the container. Without thunks, games fall back to
         # llvmpipe software rendering.
         # /run/opengl-driver has the native ARM64 Mesa/Vulkan drivers.
+        # PressureVessel needs /nix for FEX thunks (GPU forwarding) and
+        # /run/opengl-driver for native ARM64 Mesa/Vulkan drivers.
         "-e", "PRESSURE_VESSEL_FILESYSTEMS_RO=/nix:/run/opengl-driver",
+        # PulseAudio shared memory doesn't work through virtio — tell clients
+        # to use the config that disables SHM (created by the init script).
+        "-e", "PULSE_CLIENTCONFIG=/run/pulse.conf",
         "--",
         "FEXBash",
         "-c",
