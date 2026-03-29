@@ -41,6 +41,9 @@ let
     mkdir -p /run/fhs/usr/bin /run/fhs/usr/lib /run/fhs/usr/lib64
     ln -sf ${coreutils}/bin/env /run/fhs/usr/bin/env
 
+    # PressureVessel Vulkan layer overrides dir (suppresses "Internal error" warnings)
+    mkdir -p /run/fhs/usr/lib/pressure-vessel/overrides/share/vulkan/implicit_layer.d
+
     mount --bind /run/fhs/bin /bin
     mount --bind /run/fhs/usr /usr
 

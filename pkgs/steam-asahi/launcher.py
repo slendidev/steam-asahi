@@ -185,13 +185,20 @@ def run_steam(data_dir):
         "--",
         "FEXBash",
         "-c",
-        # Set env vars in the shell directly so they propagate through
-        # Steam → PressureVessel → Proton → Wine. muvm's -e may not
-        # propagate reliably into PV containers.
+        # Set env vars in the shell so they propagate through the full chain:
+        # FEXBash → steam.sh → Steam → PressureVessel → Proton → Wine
+        #
+        # Audio: PulseAudio via muvm vsock. Explicit server path since
+        # discovery may fail. SDL forced to PulseAudio to avoid ALSA thunk.
+        #
+        # Locale: NixOS uses LOCALE_ARCHIVE instead of /usr/share/i18n.
+        # Set LC_ALL=C.UTF-8 which is always available. Pass LOCALE_ARCHIVE
+        # for native tools that need it.
         "export PULSE_SERVER=unix:/run/user/{uid}/pulse/native; "
         "export SDL_AUDIODRIVER=pulseaudio; "
-        "export PROTON_LOG=1; "
-        "export WINEDEBUG=+pulse; "
+        "export LC_ALL=C.UTF-8; "
+        "export LANG=C.UTF-8; "
+        "export LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive; "
         "{data_dir}/steam-launcher/bin_steam.sh {steam_args}".format(
             uid=os.getuid(),
             data_dir=data_dir,
