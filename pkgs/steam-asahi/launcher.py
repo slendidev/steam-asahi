@@ -174,6 +174,12 @@ def run_steam(data_dir):
         MUVM,
         "--execute-pre", INIT_SCRIPT,
         "--interactive",
+        # PressureVessel (bwrap) creates a container for games. By default it
+        # doesn't mount /nix, so FEX can't find its thunks (GPU library
+        # forwarding) inside the container. Without thunks, games fall back to
+        # llvmpipe software rendering.
+        # /run/opengl-driver has the native ARM64 Mesa/Vulkan drivers.
+        "-e", "PRESSURE_VESSEL_FILESYSTEMS_RO=/nix:/run/opengl-driver",
         "--",
         "FEXBash",
         "-c",
