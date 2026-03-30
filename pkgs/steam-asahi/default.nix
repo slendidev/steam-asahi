@@ -11,6 +11,8 @@
   coreutils,
   util-linux,
   gnugrep,
+  squashfuse,
+  erofs-utils,
   steam-unwrapped,
 }:
 
@@ -146,6 +148,8 @@ let
     runtimeInputs = [
       coreutils
       gnugrep
+      squashfuse
+      erofs-utils
     ];
     text = ''
       die() { echo "ERROR: $1" >&2; exit 1; }
