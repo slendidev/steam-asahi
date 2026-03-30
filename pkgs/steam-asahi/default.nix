@@ -70,8 +70,11 @@ let
       ln -sf ${coreutils}/bin/env /run/fhs/usr/bin/env
       ln -sf ${pciutils}/bin/lspci /run/fhs/usr/bin/lspci
 
-      # PressureVessel Vulkan layer overrides dir (suppresses "Internal error" warnings)
+      # PressureVessel Vulkan layer overrides dir and populate with Steam's layers
       mkdir -p /run/fhs/usr/lib/pressure-vessel/overrides/share/vulkan/implicit_layer.d
+      for layer in /home/*/.local/share/vulkan/implicit_layer.d/steam*.json; do
+        [ -f "$layer" ] && cp "$layer" /run/fhs/usr/lib/pressure-vessel/overrides/share/vulkan/implicit_layer.d/ 2>/dev/null || true
+      done
 
       mount --bind /run/fhs/bin /bin
       mount --bind /run/fhs/usr /usr
