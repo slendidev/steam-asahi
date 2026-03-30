@@ -211,6 +211,7 @@ let
 
       echo "Launching Steam via muvm + FEX..."
       exec ${lib.getExe muvm} \
+        --gpu-mode=drm \
         --execute-pre ${lib.getExe initScript} \
         --interactive \
         -e "PRESSURE_VESSEL_FILESYSTEMS_RO=/nix:/run/opengl-driver" \
