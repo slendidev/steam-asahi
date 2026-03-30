@@ -9,122 +9,138 @@
     { self, nixpkgs }:
     let
       system = "aarch64-linux";
+      lib = nixpkgs.lib;
 
-      overlay = final: prev: {
-        # --- libkrunfw 5.3.0 (kernel 6.12.76) ---
-        libkrunfw = prev.libkrunfw.overrideAttrs (old: rec {
-          version = "5.3.0";
-
-          src = prev.fetchFromGitHub {
+      overlay =
+        final: prev:
+        let
+          mkGitHubOverride =
+            pkg:
+            {
+              owner,
+              repo,
+              version,
+              tag ? "v${version}",
+              hash,
+              fetchArgs ? { },
+              extraAttrs ? (_old: { }),
+            }:
+            pkg.overrideAttrs (
+              old:
+              let
+                newSrc = prev.fetchFromGitHub (
+                  {
+                    inherit
+                      owner
+                      repo
+                      tag
+                      hash
+                      ;
+                  }
+                  // fetchArgs
+                );
+              in
+              {
+                inherit version;
+                src = newSrc;
+              }
+              // (extraAttrs (old // { src = newSrc; }))
+            );
+        in
+        {
+          libkrunfw = mkGitHubOverride prev.libkrunfw {
             owner = "containers";
             repo = "libkrunfw";
-            tag = "v${version}";
+            version = "5.3.0";
             hash = "sha256-fhG/bP1HzmhyU2N+wnr1074WEGsD9RdTUUBhYUFpWlA=";
+            extraAttrs = _: {
+              kernelSrc = prev.fetchurl {
+                url = "mirror://kernel/linux/kernel/v6.x/linux-6.12.76.tar.xz";
+                hash = "sha256-u7Q+g0xG5r1JpcKPIuZ5qTdENATh9lMgTUskkp862JY=";
+              };
+            };
           };
 
-          kernelSrc = prev.fetchurl {
-            url = "mirror://kernel/linux/kernel/v6.x/linux-6.12.76.tar.xz";
-            hash = "sha256-u7Q+g0xG5r1JpcKPIuZ5qTdENATh9lMgTUskkp862JY=";
-          };
-        });
-
-        # --- libkrun 1.17.4 ---
-        libkrun = prev.libkrun.overrideAttrs (old: rec {
-          version = "1.17.4";
-
-          src = prev.fetchFromGitHub {
+          libkrun = mkGitHubOverride prev.libkrun {
             owner = "containers";
             repo = "libkrun";
-            tag = "v${version}";
+            version = "1.17.4";
             hash = "sha256-Th4vCg3xHb6lbo26IDZES7tLOUAJTebQK2+h3xSYX7U=";
+            extraAttrs = old: {
+              cargoDeps = prev.rustPlatform.fetchCargoVendor {
+                inherit (old) src;
+                hash = "sha256-0xpAyNe1jF1OMtc7FXMsejqIv0xKc1ktEvm3rj/mVFU=";
+              };
+              buildInputs = old.buildInputs ++ [ prev.libcap_ng ];
+            };
           };
 
-          cargoDeps = prev.rustPlatform.fetchCargoVendor {
-            inherit src;
-            hash = "sha256-0xpAyNe1jF1OMtc7FXMsejqIv0xKc1ktEvm3rj/mVFU=";
-          };
-
-          buildInputs = old.buildInputs ++ [ prev.libcap_ng ];
-        });
-
-        # --- muvm 0.5.1 ---
-        muvm = prev.muvm.overrideAttrs (old: rec {
-          version = "0.5.1";
-
-          src = prev.fetchFromGitHub {
+          muvm = mkGitHubOverride prev.muvm {
             owner = "AsahiLinux";
             repo = "muvm";
-            tag = "muvm-${version}";
+            version = "0.5.1";
+            tag = "muvm-0.5.1";
             hash = "sha256-eXsU2QRJ55gx5RhjT+m9F1KAFqGrd4WwnyR3eMpuIc4=";
+            extraAttrs = old: {
+              cargoDeps = prev.rustPlatform.importCargoLock {
+                lockFile = old.src + "/Cargo.lock";
+              };
+              postPatch = ''
+                substituteInPlace crates/muvm/src/guest/bin/muvm-guest.rs \
+                  --replace-fail "/usr/lib/systemd/systemd-udevd" "${prev.systemd}/lib/systemd/systemd-udevd"
+              ''
+              + lib.optionalString prev.stdenv.hostPlatform.isAarch64 ''
+                substituteInPlace crates/muvm/src/guest/mount.rs \
+                  --replace-fail "/usr/share/fex-emu" "${final.fex}/share/fex-emu"
+              '';
+            };
           };
 
-          cargoDeps = prev.rustPlatform.importCargoLock {
-            lockFile = src + "/Cargo.lock";
-          };
-
-          # Override postPatch: /sbin/sysctl reference was removed in 0.5.1
-          postPatch = ''
-            substituteInPlace crates/muvm/src/guest/bin/muvm-guest.rs \
-              --replace-fail "/usr/lib/systemd/systemd-udevd" "${prev.systemd}/lib/systemd/systemd-udevd"
-          ''
-          + prev.lib.optionalString prev.stdenv.hostPlatform.isAarch64 ''
-            substituteInPlace crates/muvm/src/guest/mount.rs \
-              --replace-fail "/usr/share/fex-emu" "${final.fex}/share/fex-emu"
-          '';
-        });
-
-        # --- FEX 2603 (with thunks) ---
-        fex = prev.fex.overrideAttrs (old: {
-          version = "2603";
-
-          src = prev.fetchFromGitHub {
-            owner = "FEX-Emu";
-            repo = "FEX";
-            tag = "FEX-2603";
-            hash = "sha256-rQOqziJ7IizJV3VmAWGo5s2xn2/xnp0sx3VfBtH1JK4=";
-
-            leaveDotGit = true;
-            postFetch = ''
-              cd $out
-              git reset
-
-              # Fetch required submodules for FEX 2603
-              git submodule update --init --depth 1 \
-                External/Vulkan-Headers \
-                External/drm-headers \
-                External/jemalloc_glibc \
-                External/rpmalloc \
-                External/unordered_dense \
-                External/vixl \
-                Source/Common/cpp-optparse
-
-              find . -name .git -print0 | xargs -0 rm -rf
-
-              # Remove unnecessary directories
-              rm -r \
-                External/vixl/src/aarch32 \
-                External/vixl/test
-            '';
-          };
-
-          nativeBuildInputs = old.nativeBuildInputs ++ [ prev.git ];
-
-          # Tests can't run on 16K page systems (jemalloc crashes)
-          doCheck = false;
-
-          # FEX 2603 needs a git repo for version detection (git_version.h).
-          # Create a fake one, then run the original nixpkgs postPatch for thunk path fixups.
-          postPatch = ''
-            git init
-            git config user.email "nix@localhost"
-            git config user.name "Nix"
-            git add .
-            git commit -m "FEX-2603" --quiet
-            git tag "FEX-2603"
-          ''
-          + old.postPatch;
-        });
-      };
+          fex =
+            let
+              fexSubmodules = [
+                "External/Vulkan-Headers"
+                "External/drm-headers"
+                "External/jemalloc_glibc"
+                "External/rpmalloc"
+                "External/unordered_dense"
+                "External/vixl"
+                "Source/Common/cpp-optparse"
+              ];
+            in
+            mkGitHubOverride prev.fex {
+              owner = "FEX-Emu";
+              repo = "FEX";
+              version = "2603";
+              tag = "FEX-2603";
+              hash = "sha256-rQOqziJ7IizJV3VmAWGo5s2xn2/xnp0sx3VfBtH1JK4=";
+              fetchArgs = {
+                leaveDotGit = true;
+                postFetch = ''
+                  cd $out
+                  git reset
+                  git submodule update --init --depth 1 \
+                    ${lib.concatStringsSep " \\\n              " fexSubmodules}
+                  find . -name .git -print0 | xargs -0 rm -rf
+                  rm -r External/vixl/src/aarch32 External/vixl/test
+                '';
+              };
+              extraAttrs = old: {
+                nativeBuildInputs = old.nativeBuildInputs ++ [ prev.git ];
+                doCheck = false; # jemalloc crashes on 16K page systems
+                # Fake git repo for version detection (git_version.h), then run upstream postPatch
+                postPatch = ''
+                  git init
+                  git config user.email "nix@localhost"
+                  git config user.name "Nix"
+                  git add .
+                  git commit -m "FEX-2603" --quiet
+                  git tag "FEX-2603"
+                ''
+                + old.postPatch;
+              };
+            };
+        };
 
       pkgs = import nixpkgs {
         inherit system;
@@ -160,7 +176,7 @@
           echo "Test commands:"
           echo "  muvm --interactive -- bash -c 'getconf PAGESIZE'   # should print 4096"
           echo "  muvm --interactive -- FEXBash -c 'uname -m'        # should print x86_64"
-          echo "  steam-asahi                                         # launch Steam"
+          echo "  steam-asahi                                        # launch Steam"
         '';
       };
     };
