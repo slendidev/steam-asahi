@@ -16,9 +16,16 @@
   squashfuse,
   erofs-utils,
   steam-unwrapped,
+  extraEnv ? {
+    FEX_X87REDUCEDPRECISION = "1";
+    PROTON_USE_WINED3D = "1";
+  },
 }:
 
 let
+  extraEnvExports = lib.concatStringsSep " \\\n          "
+    (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v};") extraEnv);
+
   # NixOS /etc symlinks that bwrap can't follow — materialize as real files
   etcSymlinksToMaterialize = [
     "host.conf"
@@ -69,6 +76,12 @@ let
       mkdir -p /run/fhs/usr/bin /run/fhs/usr/lib /run/fhs/usr/lib64
       ln -sf ${coreutils}/bin/env /run/fhs/usr/bin/env
       ln -sf ${pciutils}/bin/lspci /run/fhs/usr/bin/lspci
+
+      # Expose host Vulkan ICDs at standard FHS path for GPU discovery
+      mkdir -p /run/fhs/usr/share/vulkan
+      for d in /run/opengl-driver/share/vulkan/*/; do
+        [ -d "$d" ] && ln -sf "$d" /run/fhs/usr/share/vulkan/
+      done
 
       # PressureVessel Vulkan layer overrides dir and populate with Steam's layers
       mkdir -p /run/fhs/usr/lib/pressure-vessel/overrides/share/vulkan/implicit_layer.d
@@ -222,6 +235,7 @@ let
           export LC_ALL=C.UTF-8; \
           export LANG=C.UTF-8; \
           export LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive; \
+          ${extraEnvExports}
           $data_dir/steam-launcher/bin_steam.sh $steam_args"
     '';
 

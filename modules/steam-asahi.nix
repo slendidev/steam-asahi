@@ -14,9 +14,18 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.steam-asahi;
+      default = pkgs.steam-asahi.override { inherit (cfg) extraEnv; };
       defaultText = lib.literalExpression "pkgs.steam-asahi";
       description = "The steam-asahi package to use.";
+    };
+
+    extraEnv = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = {
+        FEX_X87REDUCEDPRECISION = "1";
+        PROTON_USE_WINED3D = "1";
+      };
+      description = "Extra environment variables passed to games inside the FEX/Steam environment.";
     };
   };
 
