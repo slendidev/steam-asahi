@@ -2,6 +2,10 @@
 
 Nix flake to run Steam on NixOS Asahi Linux (Apple Silicon) via muvm + FEX-Emu.
 
+<img width="3444" height="1967" alt="Image" src="https://github.com/user-attachments/assets/c8b4902b-3e69-43d7-8a21-29f91bb57f8f" />
+
+> Picture generously provided by EliSaado from the #asahi-alt oftc IRC
+
 ## Warning
 
 > [!WARNING]
