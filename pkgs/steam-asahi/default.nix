@@ -179,7 +179,8 @@ let
 
       # --- Ensure FEX rootfs ---
       fex_configured=false
-      fex_dir="$HOME/.fex-emu"
+      fex_dir="$HOME/.local/share/fex-emu/"
+
 
       if [[ -d "$fex_dir/RootFS" ]]; then
         for f in "$fex_dir/RootFS"/*; do
